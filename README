@@ -1,0 +1,15 @@
+# othello
+
+This is a othello game develop with clojure.
+
+## Usage
+
+This project develop with leiningen.
+So you can make stand-alone jar file on your own machine.
+
+## Installation
+
+
+## License
+
+
