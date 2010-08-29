@@ -118,5 +118,4 @@
       (.add panel)
       (.pack)
       (.setDefaultCloseOperation EXIT_ON_CLOSE)
-      (.setVisible true))
-    [frame panel board]))
+      (.setVisible true))))
