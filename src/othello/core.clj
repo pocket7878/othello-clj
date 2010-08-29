@@ -101,6 +101,7 @@
 (defn in-boardp [x y]
   (when (and (>= x 0) (< x width)
              (>= y 0) (< y height)) true))
+
 ;;そこに石を打つ事が可能かどうかを判断する
 (defn can-put-downp 
   ([x y var db]
@@ -135,19 +136,35 @@
           ;;相手の石しかなければ盤面外にでるのでnil
           true (recur (+ vecX X) (+ vecY 1)))))))
 
+(defn reverse-stone
+  ([x y var db]
+   (when (can-put-downp x y var 1 0 db) (reverse-stone x y var 1 0 db))
+   (when (can-put-downp x y var 0 1 db) (reverse-stone x y var 0 1 db))
+   (when (can-put-downp x y var -1 0 db) (reverse-stone x y var -1 0 db))
+   (when (can-put-downp x y var 0 -1 db) (reverse-stone x y var 0 -1 db))
+   (when (can-put-downp x y var 1 1 db) (reverse-stone x y var 1 1 db))
+   (when (can-put-downp x y var -1 -1 db) (reverse-stone x y var -1 -1 db))
+   (when (can-put-downp x y var 1 -1 db) (reverse-stone x y var 1 -1 db))
+   (when (can-put-downp x y var -1 1 db) (reverse-stone x y var -1 1 db)))
+  ([x y var vecX vecY db]
+   (loop [X (+ vecX x) Y (+ vecY y)]
+     (if (= var (get-cell X Y db)) 
+       nil
+       (do (set-cell! X Y var db)
+         (recur (+ vecX X) (+ vecY Y)))))))
+
 (defn game-panel [db]
   (proxy [JPanel MouseListener] []
     (paintComponent [g]
                     (proxy-super paintComponent g)
                     (draw-board g db))
     (mouseClicked [e]
-                  (when (can-put-downp ((dir-to-cell (.getX e) (.getY e)) :x)
-                                       ((dir-to-cell (.getY e) (.getY e)) :y) 1 db)
-                    (set-cell! ((dir-to-cell (.getX e) (.getY e)) :x)
-                               ((dir-to-cell (.getX e) (.getY e)) :y)
-                               1
-                               db)
-                    (.repaint this)))
+                  (let [cell-x ((dir-to-cell (.getX e) (.getY e)) :x)
+                        cell-y ((dir-to-cell (.getY e) (.getY e)) :y)]
+                    (when (can-put-downp cell-x cell-y 1 db)
+                      (set-cell! cell-x cell-y 1 db)
+                      (reverse-stone cell-x cell-y 1 db)
+                      (.repaint this))))
     (mousePressed [e])
     (mouseReleased [e])
     (mouseEntered [e])
