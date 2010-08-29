@@ -82,7 +82,8 @@
   (doseq [[idx elt] (indexed @db)]
     (cond (= elt 0) (fill-cell-with-image g (cell-to-point idx) gray_cell_img)
 	  (= elt 1) (fill-cell-with-image g (cell-to-point idx) pink_cell_img)
-	  (= elt 2) (fill-cell-with-image g (cell-to-point idx) blue_cell_img))))
+	  (= elt 2) (fill-cell-with-image g (cell-to-point idx) blue_cell_img)
+	  (= elt 3) (fill-cell-with-image g (cell-to-point idx) hint_cell_img))))
 
 (defn game-panel [db]
   (proxy [JPanel MouseListener] []
