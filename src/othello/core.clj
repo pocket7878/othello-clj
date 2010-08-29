@@ -78,12 +78,6 @@
   (let [[x y width height] (point-to-screen pt)]
     (.drawImage g image x y width height nil)))
 
-;;(defn draw-board [g db]
-;;  (doseq [[idx elt] (indexed @db)]
-;;    (cond (= elt 1) (fill-cell g (cell-to-point idx) (Color. 210 50 90))
-;;	  (= elt 2) (fill-cell g (cell-to-point idx) (Color. 15 160 90)))))
-;;
-
 (defn draw-board [g db]
   (doseq [[idx elt] (indexed @db)]
     (cond (= elt 0) (fill-cell-with-image g (cell-to-point idx) gray_cell_img)
@@ -118,4 +112,5 @@
       (.add panel)
       (.pack)
       (.setDefaultCloseOperation EXIT_ON_CLOSE)
-      (.setVisible true))))
+      (.setVisible true))
+    [frame panel board]))
