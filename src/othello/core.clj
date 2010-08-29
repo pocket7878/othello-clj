@@ -1,10 +1,11 @@
 (ns othello.core
   (:gen-class)
   (:import (java.awt Graphics Color Dimension)
-	   (javax.swing JPanel JFrame ImageIcon)
-	   (java.awt.event MouseListener))
+     (javax.swing JPanel JFrame ImageIcon)
+     (java.awt.event MouseListener))
   (:use clojure.contrib.import-static
-	[clojure.contrib.seq-utils]))
+        clojure.contrib.trace
+     [clojure.contrib.seq-utils]))
 
 ;; 定数を取得
 (import-static javax.swing.JFrame EXIT_ON_CLOSE)
@@ -38,16 +39,26 @@
 (defn count-ai-cell [db]
   (count-cell 2 db))
 
-;;ボードを作成
-(defn create-board [] (ref (vec (repeat (* width height) 0))))
-
-;;ボードをリセット
-(defn reset-board [db]
-  (dosync (ref-set db (vec (repeat (* width height) 0)))))
-
+;;空のボードを作成
+(defn create-blank-board [] (ref (vec (repeat (* width height) 0))))
 ;;XY座標からboard上の番号に変換
 (defn point-to-cell [x y]
   (+ (* y height) x))
+;;セルに値を設定
+(defn set-cell! [x y var db]
+  (dosync (ref-set db (assoc @db (point-to-cell x y) var))))
+;;初期のマスを配置
+(defn put-init-stone [db]
+  (set-cell! 3 3 1 db)
+  (set-cell! 4 4 1 db)
+  (set-cell! 3 4 2 db)
+  (set-cell! 4 3 2 db)
+  db)
+(defn create-board []
+  (put-init-stone (create-blank-board)))
+;;ボードをリセット
+(defn reset-board [db]
+  (dosync (ref-set db (create-board))))
 
 ;;board上の番号からXY座標に変換する
 (defn cell-to-point [num]
@@ -59,9 +70,10 @@
   (map #(* cell-size %)
        [ (pt :x) (pt :y) 1 1]))
 
-;;セルに値を設定
-(defn set-cell! [x y var db]
-  (dosync (ref-set db (assoc @db (point-to-cell x y) var))))
+
+;;セルの値を取得
+(defn get-cell [x y db]
+  (@db (point-to-cell x y)))
 
 ;;Cellを塗りつぶす
 (defn fill-cell [g pt color]
@@ -81,22 +93,61 @@
 (defn draw-board [g db]
   (doseq [[idx elt] (indexed @db)]
     (cond (= elt 0) (fill-cell-with-image g (cell-to-point idx) gray_cell_img)
-	  (= elt 1) (fill-cell-with-image g (cell-to-point idx) pink_cell_img)
-	  (= elt 2) (fill-cell-with-image g (cell-to-point idx) blue_cell_img)
-	  (= elt 3) (fill-cell-with-image g (cell-to-point idx) hint_cell_img))))
+      (= elt 1) (fill-cell-with-image g (cell-to-point idx) pink_cell_img)
+      (= elt 2) (fill-cell-with-image g (cell-to-point idx) blue_cell_img)
+      (= elt 3) (fill-cell-with-image g (cell-to-point idx) hint_cell_img))))
+
+;;セルが盤面内かどうか
+(defn in-boardp [x y]
+  (when (and (>= x 0) (< x width)
+             (>= y 0) (< y height)) true))
+;;そこに石を打つ事が可能かどうかを判断する
+(defn can-put-downp 
+  ([x y var db]
+    (cond (not (in-boardp x y)) nil
+          (not (= (get-cell x y db) 0)) nil
+          (or (can-put-downp x y var 1 0 db)
+              (can-put-downp x y var 0 1 db)
+              (can-put-downp x y var -1 0 db)
+              (can-put-downp x y var 0 -1 db)
+              (can-put-downp x y var 1 1 db)
+              (can-put-downp x y var -1 -1 db)
+              (can-put-downp x y var 1 -1 db)
+              (can-put-downp x y var -1 1 db)) true
+          true nil))
+  ([x y var vecX vecY db]
+    (cond 
+      ;;盤面外だと打てない
+      (not (in-boardp (+ vecX x) (+ vecY y))) nil
+      ;;隣が自分とおなじ石だとうてない
+      (= var (get-cell (+ vecX x) (+ vecY y) db)) nil
+      ;;隣が空白でも打てない
+      (= 0   (get-cell (+ vecX x) (+ vecY y) db)) nil
+      true
+      (loop [X (+ vecX vecX x) Y (+ vecY vecY y)]
+        (cond 
+          ;;盤面外だと打てない
+          (not (in-boardp X Y)) nil  
+          ;;一つも挟めないとうてない
+          (= 0 (get-cell X Y db)) nil
+          ;;自分とおなじ石があれば挟めるので打てる
+          (= var (get-cell X Y db)) true
+          ;;相手の石しかなければ盤面外にでるのでnil
+          true (recur (+ vecX X) (+ vecY 1)))))))
 
 (defn game-panel [db]
   (proxy [JPanel MouseListener] []
     (paintComponent [g]
-		    (proxy-super paintComponent g)
-		    (draw-board g db))
+                    (proxy-super paintComponent g)
+                    (draw-board g db))
     (mouseClicked [e]
-		  (do 
-		    (set-cell! ((dir-to-cell (.getX e) (.getY e)) :x)
-			       ((dir-to-cell (.getX e) (.getY e)) :y)
-			       1
-			       db)
-		    (.repaint this)))
+                  (when (can-put-downp ((dir-to-cell (.getX e) (.getY e)) :x)
+                                       ((dir-to-cell (.getY e) (.getY e)) :y) 1 db)
+                    (set-cell! ((dir-to-cell (.getX e) (.getY e)) :x)
+                               ((dir-to-cell (.getX e) (.getY e)) :y)
+                               1
+                               db)
+                    (.repaint this)))
     (mousePressed [e])
     (mouseReleased [e])
     (mouseEntered [e])
@@ -105,8 +156,8 @@
 
 (defn -main []
   (let [board (create-board)
-	frame (JFrame. "Othello")
-	panel (game-panel board)]
+        frame (JFrame. "Othello")
+        panel (game-panel board)]
     (doto panel
       (.addMouseListener panel))
     (doto frame
